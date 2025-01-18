@@ -1,15 +1,15 @@
 ﻿using System.Printing;
 
-namespace PrintSpooler.Utilities
+namespace PrintSpooler.WMI
 {
-    internal class PausedJob
+    public class PausedJob
     {
-        public int JobID { get; private set; }
+        public string JobName { get; set; }
+        public int JobID { get; set; }
         public long PausedTime { get; private set; }
         
-        public PausedJob(int jobID)
+        public PausedJob()
         {
-            JobID = jobID;
             PausedTime = 20 * 1000;
         }
         public PausedJob(int jobID, PrintSystemJobInfo jobInfo, long pausedTime)

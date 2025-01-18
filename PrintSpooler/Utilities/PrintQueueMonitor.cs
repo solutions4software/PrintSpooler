@@ -1,4 +1,5 @@
 ﻿using System.Printing;
+using System.Reflection;
 using System.Runtime.InteropServices;
 
 namespace PrintSpooler.Utilities
@@ -91,7 +92,7 @@ namespace PrintSpooler.Utilities
             // Let us open the printer and get the printer handle.
             _spoolerName = strSpoolName;
             //Start Monitoring
-            Start();
+            Start(strSpoolName);
 
         }
         #endregion
@@ -104,8 +105,10 @@ namespace PrintSpooler.Utilities
         #endregion
 
         #region StartMonitoring
-        public void Start()
+        public void Start(string printer)
         {
+            if (_spoolerName != printer) return;
+
             OpenPrinter(_spoolerName, out _printerHandle, 0);
             if (_printerHandle != IntPtr.Zero)
             {
@@ -114,7 +117,7 @@ namespace PrintSpooler.Utilities
                 // We have successfully registered for change notification.  Let us capture the handle...
                 _mrEvent.Handle = _changeHandle;
                 //Now, let us wait for change notification from the printer queue....
-                _waitHandle = ThreadPool.RegisterWaitForSingleObject(_mrEvent, new WaitOrTimerCallback(PrinterNotifyWaitCallback), _mrEvent, -1, true);
+                _waitHandle = ThreadPool.RegisterWaitForSingleObject(_mrEvent, new WaitOrTimerCallback(PrinterNotifyWaitCallback), _mrEvent, -1, false);
             }
 
             _spooler = new PrintQueue(new PrintServer(), _spoolerName);
@@ -145,6 +148,7 @@ namespace PrintSpooler.Utilities
             _notifyOptions.Count = 1;
             int pdwChange = 0;
             IntPtr pNotifyInfo = IntPtr.Zero;
+            //_notifyOptions = new();
             bool bResult = FindNextPrinterChangeNotification(_changeHandle, out pdwChange, _notifyOptions, out pNotifyInfo);
             //If the Printer Change Notification Call did not give data, exit code
             if (bResult == false || (int)pNotifyInfo == 0) return;
@@ -152,13 +156,15 @@ namespace PrintSpooler.Utilities
             bool bJobRelatedChange = (pdwChange & PRINTER_CHANGES.PRINTER_CHANGE_ADD_JOB) == PRINTER_CHANGES.PRINTER_CHANGE_ADD_JOB ||
                                      (pdwChange & PRINTER_CHANGES.PRINTER_CHANGE_SET_JOB) == PRINTER_CHANGES.PRINTER_CHANGE_SET_JOB ||
                                      (pdwChange & PRINTER_CHANGES.PRINTER_CHANGE_DELETE_JOB) == PRINTER_CHANGES.PRINTER_CHANGE_DELETE_JOB ||
-                                     (pdwChange & PRINTER_CHANGES.PRINTER_CHANGE_WRITE_JOB) == PRINTER_CHANGES.PRINTER_CHANGE_WRITE_JOB;
+                                     (pdwChange & PRINTER_CHANGES.PRINTER_CHANGE_WRITE_JOB) == PRINTER_CHANGES.PRINTER_CHANGE_WRITE_JOB ||
+                                     (pdwChange & PRINTER_CHANGES.PRINTER_CHANGE_JOB) == PRINTER_CHANGES.PRINTER_CHANGE_JOB;
             if (!bJobRelatedChange) return;
             #endregion 
 
             #region populate Notification Information
             //Now, let us initialize and populate the Notify Info data
             PRINTER_NOTIFY_INFO info = (PRINTER_NOTIFY_INFO)Marshal.PtrToStructure(pNotifyInfo, typeof(PRINTER_NOTIFY_INFO));
+            info.Flags = 0;
             int pData = (int)pNotifyInfo + Marshal.SizeOf(typeof(PRINTER_NOTIFY_INFO));
             PRINTER_NOTIFY_INFO_DATA[] data = new PRINTER_NOTIFY_INFO_DATA[info.Count];
             for (uint i = 0; i < info.Count; i++)
@@ -211,11 +217,6 @@ namespace PrintSpooler.Utilities
 
         }
         #endregion
-
-        private long ConvertIntPtr(IntPtr intPtr)
-        {
-            return (Environment.Is64BitProcess) ? intPtr.ToInt64() : intPtr.ToInt32();
-        }
 
     }
 }
