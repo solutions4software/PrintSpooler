@@ -115,36 +115,6 @@ namespace PrintSpooler
             
         }//end SpotTroubleUsingJobAttributes
 
-        internal static void HandlePausedJob(PrintSystemJobInfo theJob)
-        {
-            // If there's no good reason for the queue to be paused, resume it and 
-            // give user choice to resume or cancel the job.
-            //Console.WriteLine("The user or someone with administrative rights to the queue" +
-            //     "\nhas paused the job or queue." +
-            //     "\nResume the queue? (Has no effect if queue is not paused.)" +
-            //     "\nEnter \"Y\" to resume, otherwise press return: ");
-            //String resume = Console.ReadLine();
-            if (MonitorPrinter.JobDetails(theJob.HostingPrintQueue.Name, theJob.JobIdentifier))
-            {
-                theJob.HostingPrintQueue.Resume();
-                theJob.Resume();
-                // It is possible the job is also paused. Find out how the user wants to handle that.
-                //Console.WriteLine("Does user want to resume print job or cancel it?" +
-                //    "\nEnter \"Y\" to resume (any other key cancels the print job): ");
-                //String userDecision = Console.ReadLine();
-                //if (userDecision == "Y")
-                //{
-                //    theJob.Resume();
-                //}
-
-            }//end if the queue should be resumed
-            else
-            {
-                theJob.Cancel();
-            }
-
-        }//end HandlePausedJob
-
         List<MonitorPrinter> monitorPrinters = new List<MonitorPrinter>();
 
         private void btnAddToMonitorList_Click(object sender, EventArgs e)

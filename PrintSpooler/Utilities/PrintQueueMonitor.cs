@@ -1,9 +1,13 @@
-﻿using System.Printing;
+﻿using System.ComponentModel;
+using System.Management;
+using System.Printing;
 using System.Reflection;
+using System.Runtime;
 using System.Runtime.InteropServices;
 
 namespace PrintSpooler.Utilities
 {
+    //https://www.codeproject.com/script/Content/ViewAssociatedFile.aspx?rzp=%2FKB%2Fprinting%2FPrinterQueueMonitor%2F%2FPrintSpooler.zip&zep=PrintQueueMonitor%2FPrintQueueMonitor.cs&obid=51085&obtid=2&ovid=6
     public class PrintJobChangeEventArgs : EventArgs
     {
         #region private variables
@@ -35,14 +39,14 @@ namespace PrintSpooler.Utilities
         [DllImport("winspool.drv", EntryPoint = "OpenPrinterA", SetLastError = true, CharSet = CharSet.Ansi, ExactSpelling = true, CallingConvention = CallingConvention.StdCall)]
         public static extern bool OpenPrinter(string pPrinterName,
         out IntPtr phPrinter,
-        int pDefault);
+        IntPtr pDefault);
 
         [DllImport("winspool.drv", EntryPoint = "ClosePrinter",
             SetLastError = true,
             ExactSpelling = true,
             CallingConvention = CallingConvention.StdCall)]
         public static extern bool ClosePrinter
-        (int hPrinter);
+        (IntPtr hPrinter);
 
         [DllImport("winspool.drv",
         EntryPoint = "FindFirstPrinterChangeNotification",
@@ -109,7 +113,7 @@ namespace PrintSpooler.Utilities
         {
             if (_spoolerName != printer) return;
 
-            OpenPrinter(_spoolerName, out _printerHandle, 0);
+            OpenPrinter(_spoolerName, out _printerHandle, IntPtr.Zero);
             if (_printerHandle != IntPtr.Zero)
             {
                 //We got a valid Printer handle.  Let us register for change notification....
@@ -133,7 +137,7 @@ namespace PrintSpooler.Utilities
         {
             if (_printerHandle != IntPtr.Zero)
             {
-                ClosePrinter((int)_printerHandle);
+                ClosePrinter((IntPtr)_printerHandle);
                 _printerHandle = IntPtr.Zero;
             }
         }
@@ -148,74 +152,179 @@ namespace PrintSpooler.Utilities
             _notifyOptions.Count = 1;
             int pdwChange = 0;
             IntPtr pNotifyInfo = IntPtr.Zero;
-            //_notifyOptions = new();
-            bool bResult = FindNextPrinterChangeNotification(_changeHandle, out pdwChange, _notifyOptions, out pNotifyInfo);
-            //If the Printer Change Notification Call did not give data, exit code
-            if (bResult == false || (int)pNotifyInfo == 0) return;
-            //If the Change Notification was not relgated to job, exit code
-            bool bJobRelatedChange = (pdwChange & PRINTER_CHANGES.PRINTER_CHANGE_ADD_JOB) == PRINTER_CHANGES.PRINTER_CHANGE_ADD_JOB ||
-                                     (pdwChange & PRINTER_CHANGES.PRINTER_CHANGE_SET_JOB) == PRINTER_CHANGES.PRINTER_CHANGE_SET_JOB ||
-                                     (pdwChange & PRINTER_CHANGES.PRINTER_CHANGE_DELETE_JOB) == PRINTER_CHANGES.PRINTER_CHANGE_DELETE_JOB ||
-                                     (pdwChange & PRINTER_CHANGES.PRINTER_CHANGE_WRITE_JOB) == PRINTER_CHANGES.PRINTER_CHANGE_WRITE_JOB ||
-                                     (pdwChange & PRINTER_CHANGES.PRINTER_CHANGE_JOB) == PRINTER_CHANGES.PRINTER_CHANGE_JOB;
-            if (!bJobRelatedChange) return;
+            try
+            {
+                bool bResult = FindNextPrinterChangeNotification(_changeHandle, out pdwChange, _notifyOptions, out pNotifyInfo);
+                //If the Printer Change Notification Call did not give data, exit code
+                //if (bResult == false || (int)pNotifyInfo == 0) return;
+                if (bResult == false || pNotifyInfo == IntPtr.Zero) return;
+                //If the Change Notification was not relgated to job, exit code
+                bool bJobRelatedChange = (pdwChange & PRINTER_CHANGES.PRINTER_CHANGE_ADD_JOB) == PRINTER_CHANGES.PRINTER_CHANGE_ADD_JOB ||
+                                         (pdwChange & PRINTER_CHANGES.PRINTER_CHANGE_SET_JOB) == PRINTER_CHANGES.PRINTER_CHANGE_SET_JOB ||
+                                         (pdwChange & PRINTER_CHANGES.PRINTER_CHANGE_DELETE_JOB) == PRINTER_CHANGES.PRINTER_CHANGE_DELETE_JOB ||
+                                         (pdwChange & PRINTER_CHANGES.PRINTER_CHANGE_WRITE_JOB) == PRINTER_CHANGES.PRINTER_CHANGE_WRITE_JOB;
+                if (!bJobRelatedChange) return;
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(ex.Message + ex.StackTrace);
+            }
             #endregion 
 
             #region populate Notification Information
-            //Now, let us initialize and populate the Notify Info data
-            PRINTER_NOTIFY_INFO info = (PRINTER_NOTIFY_INFO)Marshal.PtrToStructure(pNotifyInfo, typeof(PRINTER_NOTIFY_INFO));
-            info.Flags = 0;
-            int pData = (int)pNotifyInfo + Marshal.SizeOf(typeof(PRINTER_NOTIFY_INFO));
-            PRINTER_NOTIFY_INFO_DATA[] data = new PRINTER_NOTIFY_INFO_DATA[info.Count];
-            for (uint i = 0; i < info.Count; i++)
+            try
             {
-                data[i] = (PRINTER_NOTIFY_INFO_DATA)Marshal.PtrToStructure((IntPtr)pData, typeof(PRINTER_NOTIFY_INFO_DATA));
-                pData += Marshal.SizeOf(typeof(PRINTER_NOTIFY_INFO_DATA));
-            }
-            #endregion
-
-            #region iterate through all elements in the data array
-            for (int i = 0; i < data.Count(); i++)
-            {
-
-                if (data[i].Field == (ushort)PRINTERJOBNOTIFICATIONTYPES.JOB_NOTIFY_FIELD_STATUS &&
-                     data[i].Type == (ushort)PRINTERNOTIFICATIONTYPES.JOB_NOTIFY_TYPE
-                    )
+                //Now, let us initialize and populate the Notify Info data
+                PRINTER_NOTIFY_INFO info = (PRINTER_NOTIFY_INFO)Marshal.PtrToStructure(pNotifyInfo, typeof(PRINTER_NOTIFY_INFO));
+                long pData = (long)pNotifyInfo + (long)Marshal.OffsetOf(typeof(PRINTER_NOTIFY_INFO), "aData");
+                PRINTER_NOTIFY_INFO_DATA[] data = new PRINTER_NOTIFY_INFO_DATA[info.Count];
+                for (uint i = 0; i < info.Count; i++)
                 {
-                    JOBSTATUS jStatus = (JOBSTATUS)Enum.Parse(typeof(JOBSTATUS), data[i].NotifyData.Data.cbBuf.ToString());
-                    int intJobID = (int)data[i].Id;
-                    string strJobName = "";
-                    PrintSystemJobInfo pji = null;
-                    try
-                    {
-                        _spooler = new PrintQueue(new PrintServer(), _spoolerName);
-                        pji = _spooler.GetJob(intJobID);
-                        if (!objJobDict.ContainsKey(intJobID))
-                            objJobDict[intJobID] = pji.Name;
-                        strJobName = pji.Name;
-                    }
-                    catch
-                    {
-                        pji = null;
-                        objJobDict.TryGetValue(intJobID, out strJobName);
-                        if (strJobName == null) strJobName = "";
-                    }
+                    data[i] = (PRINTER_NOTIFY_INFO_DATA)Marshal.PtrToStructure((IntPtr)pData, typeof(PRINTER_NOTIFY_INFO_DATA));
+                    pData += Marshal.SizeOf(typeof(PRINTER_NOTIFY_INFO_DATA));
+                }
 
-                    if (OnJobStatusChange != null)
+                #region iterate through all elements in the data array
+                for (int i = 0; i < data.Count(); i++)
+                {
+                    if (data[i].Field == (ushort)PRINTERJOBNOTIFICATIONTYPES.JOB_NOTIFY_FIELD_STATUS &&
+                        data[i].Type == (ushort)PRINTERNOTIFICATIONTYPES.JOB_NOTIFY_TYPE)
                     {
-                        //Let us raise the event
-                        OnJobStatusChange(this, new PrintJobChangeEventArgs(intJobID, strJobName, jStatus, pji));
+                        JOBSTATUS jStatus = (JOBSTATUS)Enum.Parse(typeof(JOBSTATUS), data[i].NotifyData.Data.cbBuf.ToString());
+                        int intJobID = (int)data[i].Id;
+                        string strJobName = "";
+                        PrintSystemJobInfo pji = null;
+                        try
+                        {
+                            _spooler = new PrintQueue(new PrintServer(), _spoolerName);
+                            pji = _spooler.GetJob(intJobID);
+                            if (!objJobDict.ContainsKey(intJobID))
+                                objJobDict[intJobID] = pji.Name;
+                            strJobName = pji.Name;
+                        }
+                        catch
+                        {
+                            pji = null;
+                            objJobDict.TryGetValue(intJobID, out strJobName);
+                            if (strJobName == null) strJobName = "";
+                        }
+
+                        if (OnJobStatusChange != null)
+                        {
+                            //Let us raise the event
+                            OnJobStatusChange(this, new PrintJobChangeEventArgs(intJobID, strJobName, jStatus, pji));
+                        }
                     }
                 }
+                #endregion
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(ex.Message + ex.StackTrace);
             }
             #endregion
 
             #region reset the Event and wait for the next event
-            _mrEvent.Reset();
-            _waitHandle = ThreadPool.RegisterWaitForSingleObject(_mrEvent, new WaitOrTimerCallback(PrinterNotifyWaitCallback), _mrEvent, -1, true);
+            try
+            {
+                _mrEvent.Reset();
+                _waitHandle = ThreadPool.RegisterWaitForSingleObject(_mrEvent, new WaitOrTimerCallback(PrinterNotifyWaitCallback), _mrEvent, -1, true);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(ex.Message + ex.StackTrace);
+            }
             #endregion 
 
         }
+        #endregion
+
+        #region PrintJobHelper
+
+        [DllImport("winspool.drv", EntryPoint = "GetJob", 
+            SetLastError = true, CharSet = CharSet.Auto, 
+            ExactSpelling = false, 
+            CallingConvention = CallingConvention.StdCall)]
+        public static extern bool GetJob([In] IntPtr hPrinter, [In] Int32 dwJobId, [In] Int32 Level, 
+            [Out] byte[] lpJob, 
+            [In] Int32 cbBuf, 
+            ref Int32 lpbSizeNeeded);
+
+        public int GetNumberOfCopies(int jobId)
+        {
+            int copies = 1;
+            try
+            {
+                var BytesWritten = new Int32();
+                var ptBuf = new byte[0];
+
+                if (_printerHandle == IntPtr.Zero)
+                {
+                    MessageBox.Show("Printer not found!");
+                    return 1;
+                }
+
+                // Get required buffer size
+                if (!GetJob(_printerHandle, jobId, 2, ptBuf, 0, ref BytesWritten))
+                {
+                    if (BytesWritten == 0)
+                    {
+                        var ex = new Win32Exception();
+                            throw new Exception("Job not found or access denied");
+                    }
+                }
+
+                // \\ Allocate a buffer the right size
+                if (BytesWritten > 0)
+                    ptBuf = new byte[BytesWritten];
+
+                // Allocate buffer and retrieve job info
+                IntPtr pJob = Marshal.AllocHGlobal(BytesWritten);
+                try
+                {
+                    if (!GetJob(_printerHandle, jobId, 2, ptBuf, BytesWritten, ref BytesWritten))
+                    {
+                        throw new Exception("GetJob for JOB_INFO_2 failed on handle: " + _printerHandle.ToString() + " for job: " + jobId + " and type: " + GetType().ToString());
+                    }
+                    else
+                    {
+                        GCHandle handle = GCHandle.Alloc(ptBuf, GCHandleType.Pinned);
+                        JOB_INFO_2 jobInfo = (JOB_INFO_2)Marshal.PtrToStructure(handle.AddrOfPinnedObject(), typeof(JOB_INFO_2));
+                        handle.Free();
+                        //Marshal.PtrToStructure(ptBuf, this);
+
+                        //JOB_INFO_2 jobInfo = Marshal.PtrToStructure<JOB_INFO_2>(ptBuf, typeof(JOB_INFO_2));
+
+                        // Extract copies from DEVMODE
+                        if (jobInfo.pDevMode != IntPtr.Zero)
+                        {
+                            DEVMODE devMode = Marshal.PtrToStructure<DEVMODE>(jobInfo.pDevMode);
+                            //MessageBox.Show(devMode.ToString());
+                            return devMode.dmCopies;
+                        }
+                    }
+
+                    //if (!GetJob(_printerHandle, (uint)jobId, 2, pJob, bytesNeeded, out _))
+                    //    Marshal.ThrowExceptionForHR(Marshal.GetHRForLastWin32Error());
+
+                }
+                catch(Exception ex)
+                {
+                    MessageBox.Show(ex.Message);
+                }
+                finally
+                {
+                    Marshal.FreeHGlobal(pJob);
+                }
+            }
+            catch(Exception ex)
+            {
+                MessageBox.Show(ex.Message);
+            }
+            MessageBox.Show("Default to 1 copy if DEVMODE is unavailable");
+            return copies;
+        }
+
         #endregion
 
     }

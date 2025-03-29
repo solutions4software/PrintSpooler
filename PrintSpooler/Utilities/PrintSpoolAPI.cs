@@ -16,7 +16,7 @@ namespace PrintSpooler.Utilities
         JOB_CONTROL_RELEASE = 9,
     }
 
-    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Ansi)]
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Auto)]
     public struct DEVMODE
     {
         [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 32)]
@@ -27,10 +27,14 @@ namespace PrintSpooler.Utilities
         public short dmSize;
         public short dmDriverExtra;
         public int dmFields;
-        public int dmPositionX;
-        public int dmPositionY;
-        public int dmDisplayOrientation;
-        public int dmDisplayFixedOutput;
+        public short dmOrientation;
+        public short dmPaperSize;
+        public short dmPaperLength;
+        public short dmPaperWidth;
+        public short dmScale;
+        public short dmCopies;
+        public short dmDefaultSource;
+        public short dmPrintQuality;
         public short dmColor;
         public short dmDuplex;
         public short dmYResolution;
@@ -40,20 +44,12 @@ namespace PrintSpooler.Utilities
         [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 32)]
         public string dmFormName;
 
-        public short dmLogPixels;
+        public short dmUnusedPadding;
         public short dmBitsPerPel;
         public int dmPelsWidth;
         public int dmPelsHeight;
         public int dmDisplayFlags;
         public int dmDisplayFrequency;
-        public int dmICMMethod;
-        public int dmICMIntent;
-        public int dmMediaType;
-        public int dmDitherType;
-        public int dmReserved1;
-        public int dmReserved2;
-        public int dmPanningWidth;
-        public int dmPanningHeight;
 
         public override string ToString()
         {
@@ -64,55 +60,52 @@ namespace PrintSpooler.Utilities
                 dmSize == {3},
                 dmDriverExtra == {4},
                 dmFields == {5},
-                dmPositionX == {6},
-                dmPositionY == {7},
-                dmDisplayOrientation == {8},
-                dmDisplayFixedOutput == {9},
-                dmColor == {10},
-                dmDuplex == {11},
-                dmYResolution == {12},
-                dmTTOption == {13},
-                dmCollate == {14},
-                dmFormName == {15},
-                dmLogPixels == {16},
-                dmBitsPerPel == {17},
-                dmPelsWidth == {18},
-                dmPelsHeight == {19},
-                dmDisplayFlags == {20},
-                dmDisplayFrequency == {21},
-                dmICMMethod == {22},
-                dmICMIntent == {23},
-                dmMediaType == {24},
-                dmPanningWidth == {25},
-                dmPanningHeight == {26}",
+                dmOrientation == {6},
+                dmPaperSize == {7},
+                dmPaperLength == {8},
+                dmPaperWidth == {9},
+                dmScale == {10},
+                dmCopies == {11},
+                dmDefaultSource == {12},
+                dmPrintQuality == {13},
+                dmColor == {14},
+                dmDuplex == {15},
+                dmYResolution == {16},
+                dmTTOption == {17},
+                dmCollate == {18},
+                dmFormName == {19},
+                dmUnusedPadding == {20},
+                dmBitsPerPel == {21},
+                dmPelsWidth == {22},
+                dmPelsHeight == {23},
+                dmDisplayFlags == {24},
+                dmDisplayFrequency == {25}",
                 dmDeviceName,
                 dmSpecVersion,
                 dmDriverVersion,
                 dmSize,
                 dmDriverExtra,
                 dmFields,
-                dmPositionX,
-                dmPositionY,
-                dmDisplayOrientation,
-                dmDisplayFixedOutput,
+                dmOrientation,
+                dmPaperSize,
+                dmPaperLength,
+                dmPaperWidth,
+                dmScale,
+                dmCopies,
+                dmDefaultSource,
+                dmPrintQuality,
                 dmColor,
                 dmDuplex,
                 dmYResolution,
                 dmTTOption,
                 dmCollate,
                 dmFormName,
-                dmLogPixels,
+                dmUnusedPadding,
                 dmBitsPerPel,
                 dmPelsWidth,
                 dmPelsHeight,
                 dmDisplayFlags,
-                dmDisplayFrequency,
-                dmICMMethod,
-                dmICMIntent,
-                dmMediaType,
-                dmPanningWidth,
-                dmPanningHeight);
-
+                dmDisplayFrequency);
         }
     }
 
@@ -230,43 +223,33 @@ namespace PrintSpooler.Utilities
         public SYSTEMTIME Submitted;
     }
 
-    public struct JOBINFO
+    [StructLayout(LayoutKind.Sequential)]
+    public struct JOB_INFO_2
     {
-
-        public int JobId;
-
-        [MarshalAs(UnmanagedType.LPTStr)]
+        public uint JobId;
         public string pPrinterName;
-
-        [MarshalAs(UnmanagedType.LPTStr)]
         public string pMachineName;
-
-        [MarshalAs(UnmanagedType.LPTStr)]
         public string pUserName;
-
-        [MarshalAs(UnmanagedType.LPTStr)]
         public string pDocument;
-
-        [MarshalAs(UnmanagedType.LPTStr)]
+        public string pNotifyName;
         public string pDatatype;
-
-        [MarshalAs(UnmanagedType.LPTStr)]
+        public string pPrintProcessor;
+        public string pParameters;
+        public string pDriverName;
+        public IntPtr pDevMode; // Pointer to DEVMODE
         public string pStatus;
-
-        public int Status;
-
-        public int Priority;
-
-        public int Position;
-
-        public int TotalPages;
-
-        public int PagesPrinted;
-
+        public IntPtr pSecurityDescriptor;
+        public uint Status;
+        public uint Priority;
+        public uint Position;
+        public uint StartTime;
+        public uint UntilTime;
+        public uint TotalPages;
+        public uint Size;
         public SYSTEMTIME Submitted;
-
+        public uint Time;
+        public uint PagesPrinted;
     }
-
 
     [Flags]
     public enum PRINTERATTRIBUTES
@@ -562,6 +545,7 @@ namespace PrintSpooler.Utilities
         public uint Version;
         public uint Flags;
         public uint Count;
+        public PRINTER_NOTIFY_INFO_DATA_UNION aData;
     }
 
 

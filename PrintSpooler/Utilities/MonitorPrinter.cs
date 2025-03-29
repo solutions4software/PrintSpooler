@@ -1,5 +1,7 @@
-﻿using System.Management;
+﻿using System.Drawing.Printing;
+using System.Management;
 using System.Printing;
+using System.Text.Json.Serialization;
 using System.Timers;
 using System.Windows.Threading;
 
@@ -10,8 +12,9 @@ namespace PrintSpooler.Utilities
         List<int> pausedJobIds = new();
         PrintQueueMonitor pqm;
         System.Timers.Timer timer;
-
+        PrinterSettings printerSettings;
         readonly public string printer;
+        IntPtr devmode = IntPtr.Zero;
 
         Form1 form;
 
@@ -21,6 +24,9 @@ namespace PrintSpooler.Utilities
             this.form = form;
             pqm = new PrintQueueMonitor(printer);
             pqm.OnJobStatusChange += new PrintJobStatusChanged(pqm_OnJobStatusChange);
+            printerSettings = new PrinterSettings();
+            printerSettings.PrinterName = printer;
+            devmode = printerSettings.GetHdevmode(new PageSettings());
 
             timer = new(1000 * 1);
             timer.Elapsed += new ElapsedEventHandler(Timer_Tick);
@@ -48,7 +54,8 @@ namespace PrintSpooler.Utilities
                         job.Refresh();
                         if (job.IsPaused && !job.IsSpooling)
                         {
-                            job.HostingPrintQueue.Refresh();
+                            PrintQueue pq = job.HostingPrintQueue;
+                            pq.Refresh();
                             if (JobDetails(printer, job.JobIdentifier))
                             {
                                 job.Resume();
@@ -89,21 +96,11 @@ namespace PrintSpooler.Utilities
 
                 form.UpdatePrintInfoList(job, e);
                 
-                if (job.IsSpooling)
+                if (job.IsSpooling && !job.IsPaused)
                 {
                     job.Pause();
                     if(!pausedJobIds.Any(i => i == job.JobIdentifier))
                         pausedJobIds.Add(e.JobID);
-                }
-                else if (job.IsPaused && !job.IsSpooling)
-                {
-                    //PrintQueue pq = job.HostingPrintQueue;
-                    //pq.Refresh();
-                }
-                else
-                {
-                    PrintQueue pq = job.HostingPrintQueue;
-                    pq.Refresh();
                 }
 
             }
@@ -227,7 +224,7 @@ namespace PrintSpooler.Utilities
 
         #endregion DeletePrintJob
 
-        public static bool JobDetails(string printerName, int printJobID)
+        public bool JobDetails(string printerName, int printJobID)
         {
             bool isContinuePrinting = false;
             try
@@ -257,16 +254,19 @@ namespace PrintSpooler.Utilities
                             string jobStatus = prntJob.Properties["JobStatus"].Value + "";
                             uint totalPages = (uint)prntJob.Properties["TotalPages"].Value;
                             string color = (prntJob.Properties["Color"].Value+"" == "Color") ? "Color" : "Black and white";
+                            int copies = pqm.GetNumberOfCopies(prntJobID);
 
                             string jobDetails = string.Format(
                                     "Job Status: {0}\n" +
                                     "Printer: {1}\n" +
                                     "No. of Pages: {2}\n" +
-                                    "Color: {3}\n" +
+                                    "No. of Copies: {3}\n" +
+                                    "Color: {4}\n" +
                                     "\nWould you like to continue printing?",
                                     jobStatus,
                                     prnterName,
                                     totalPages,
+                                    copies,
                                     color);
 
                             DialogResult result = MessageBox.Show(jobDetails, "Job Details", MessageBoxButtons.YesNo);
