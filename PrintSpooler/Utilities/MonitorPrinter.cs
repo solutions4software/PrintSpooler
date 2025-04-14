@@ -131,7 +131,7 @@ namespace PrintSpooler.Utilities
             }
             catch (Exception ex)
             {
-                Logger.Error(ex);
+                MessageBox.Show(ex.Message + Environment.NewLine + ex.StackTrace);
             }
             return job;
         }
