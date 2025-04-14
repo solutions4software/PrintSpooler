@@ -49,6 +49,7 @@ namespace PrintSpooler.Utilities
         public int dmPelsWidth;
         public int dmPelsHeight;
         public int dmDisplayFlags;
+        //public int dmNup;
         public int dmDisplayFrequency;
 
         public override string ToString()
@@ -107,6 +108,18 @@ namespace PrintSpooler.Utilities
                 dmDisplayFlags,
                 dmDisplayFrequency);
         }
+    }
+
+    /// <summary>
+    /// Switches between color and monochrome on color printers.
+    /// </summary>
+    internal enum DMCOLOR : short
+    {
+        DMCOLOR_UNKNOWN = 0,
+
+        DMCOLOR_MONOCHROME = 1,
+
+        DMCOLOR_COLOR = 2
     }
 
     [StructLayout(LayoutKind.Sequential)]

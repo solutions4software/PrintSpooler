@@ -250,9 +250,9 @@ namespace PrintSpooler.Utilities
             [In] Int32 cbBuf, 
             ref Int32 lpbSizeNeeded);
 
-        public int GetNumberOfCopies(int jobId)
+        public PrintJobDetails GetJobDetails(int jobId, string status, string printerName)
         {
-            int copies = 1;
+            PrintJobDetails printJobDetails = new();
             try
             {
                 var BytesWritten = new Int32();
@@ -261,7 +261,7 @@ namespace PrintSpooler.Utilities
                 if (_printerHandle == IntPtr.Zero)
                 {
                     MessageBox.Show("Printer not found!");
-                    return 1;
+                    return printJobDetails;
                 }
 
                 // Get required buffer size
@@ -291,22 +291,25 @@ namespace PrintSpooler.Utilities
                         GCHandle handle = GCHandle.Alloc(ptBuf, GCHandleType.Pinned);
                         JOB_INFO_2 jobInfo = (JOB_INFO_2)Marshal.PtrToStructure(handle.AddrOfPinnedObject(), typeof(JOB_INFO_2));
                         handle.Free();
-                        //Marshal.PtrToStructure(ptBuf, this);
 
-                        //JOB_INFO_2 jobInfo = Marshal.PtrToStructure<JOB_INFO_2>(ptBuf, typeof(JOB_INFO_2));
+                        //JOBSTATUS jStatus = (JOBSTATUS)Enum.Parse(typeof(JOBSTATUS), ((uint)BytesWritten).ToString());
 
+                        printJobDetails.JobID = jobId;
+                        printJobDetails.JobStatus = status;
+                        printJobDetails.PrinterName = printerName;
+                        printJobDetails.NoOfPages = (int)jobInfo.TotalPages;
+                        
                         // Extract copies from DEVMODE
                         if (jobInfo.pDevMode != IntPtr.Zero)
                         {
                             DEVMODE devMode = Marshal.PtrToStructure<DEVMODE>(jobInfo.pDevMode);
                             //MessageBox.Show(devMode.ToString());
-                            return devMode.dmCopies;
+                            printJobDetails.NoOfCopies = devMode.dmCopies;
+                            printJobDetails.IsColor = devMode.dmColor == 2;
                         }
+                        printJobDetails.NoOfSheets = printJobDetails.NoOfPages * printJobDetails.NoOfCopies;
+                        printJobDetails.Color = printJobDetails.IsColor ? "Color" : "Black and white";
                     }
-
-                    //if (!GetJob(_printerHandle, (uint)jobId, 2, pJob, bytesNeeded, out _))
-                    //    Marshal.ThrowExceptionForHR(Marshal.GetHRForLastWin32Error());
-
                 }
                 catch(Exception ex)
                 {
@@ -321,8 +324,8 @@ namespace PrintSpooler.Utilities
             {
                 MessageBox.Show(ex.Message);
             }
-            MessageBox.Show("Default to 1 copy if DEVMODE is unavailable");
-            return copies;
+            //MessageBox.Show("Default to 1 copy if DEVMODE is unavailable");
+            return printJobDetails;
         }
 
         #endregion
